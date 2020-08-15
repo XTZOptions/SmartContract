@@ -1,17 +1,13 @@
 import smartpy as sp
 
-# Note: you MUST set the address of the admin in order to be able to mint. Set the admin
-# to be the address of the crowdfund contract.
-
 class SmartCoin(sp.Contract):
     def __init__(self, admin):
-        self.init(paused = False, balances = sp.big_map(), administrator = admin, totalSupply = 0)
+        self.init(balances = sp.big_map(), administrator = admin, totalSupply = 0)
 
     @sp.entry_point
     def transfer(self, params):
         sp.verify((sp.sender == self.data.administrator) |
-            (~self.data.paused &
-            ((params.fromAddr == sp.sender) |
+            (((params.fromAddr == sp.sender) |
                  (self.data.balances[params.fromAddr].approvals[sp.sender] >= params.amount))))
         self.addAddressIfNecessary(params.toAddr)
         sp.verify(self.data.balances[params.fromAddr].balance >= params.amount)
@@ -24,14 +20,9 @@ class SmartCoin(sp.Contract):
     @sp.entry_point
     def approve(self, params):
         sp.verify((sp.sender == self.data.administrator) |
-                  (~self.data.paused & (params.fromAddr == sp.sender)))
+                  (params.fromAddr == sp.sender))
         sp.verify(self.data.balances[params.fromAddr].approvals.get(params.toAddr, 0) == 0)
         self.data.balances[params.fromAddr].approvals[params.toAddr] = params.amount
-
-    @sp.entry_point
-    def setPause(self, params):
-        sp.verify(sp.sender == self.data.administrator)
-        self.data.paused = params
 
     @sp.entry_point
     def setAdministrator(self, params):
@@ -60,10 +51,6 @@ class SmartCoin(sp.Contract):
         sp.verify(self.data.balances[params.address].balance >= params.amount)
         self.data.balances[params.address].balance -= params.amount
         
-    @sp.entry_point
-    def UnlockPutMethod(self,params):
-        sp.verify(sp.sender == self.data.administrator)
-        self.data.balances[params.address].balance += params.amount
     
     def addAddressIfNecessary(self, address):
         sp.if ~ self.data.balances.contains(address):
@@ -94,7 +81,7 @@ if "templates" not in __name__:
         scenario += c1
         scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
         scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
-        scenario += c1.LockPutMethod(address = bob, amount = 10000).run(sender = admin)
+        scenario += c1.LockPutMethod(address = bob, amount = 10).run(sender = admin)
         
  
        
