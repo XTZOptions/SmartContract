@@ -54,6 +54,17 @@ class SmartCoin(sp.Contract):
         self.data.balances[params.address].balance -= params.amount
         self.data.totalSupply -= params.amount
 
+    @sp.entry_point
+    def LockPutMethod(self,params):
+        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(self.data.balances[params.address].balance >= params.amount)
+        self.data.balances[params.address].balance -= params.amount
+        
+    @sp.entry_point
+    def UnlockPutMethod(self,params):
+        sp.verify(sp.sender == self.data.administrator)
+        self.data.balances[params.address].balance += params.amount
+    
     def addAddressIfNecessary(self, address):
         sp.if ~ self.data.balances.contains(address):
             self.data.balances[address] = sp.record(balance = 0, approvals = {})
@@ -83,6 +94,7 @@ if "templates" not in __name__:
         scenario += c1
         scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
         scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
+        scenario += c1.LockPutMethod(address = bob, amount = 10000).run(sender = admin)
         
  
        
