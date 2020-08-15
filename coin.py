@@ -5,7 +5,7 @@ import smartpy as sp
 
 class SmartCoin(sp.Contract):
     def __init__(self, admin):
-        self.init(paused = False, balances = sp.big_map(), administrator = admin, totalSupply = 0,price=300)
+        self.init(paused = False, balances = sp.big_map(), administrator = admin, totalSupply = 0)
 
     @sp.entry_point
     def transfer(self, params):
@@ -44,8 +44,8 @@ class SmartCoin(sp.Contract):
         tezValue=sp.tez(sp.as_nat(params.amount))
         sp.verify(sp.amount == tezValue)
         self.addAddressIfNecessary(params.address)
-        self.data.balances[params.address].balance += params.amount*self.data.price*100
-        self.data.totalSupply += params.amount*self.data.price*100
+        self.data.balances[params.address].balance += params.amount*10000
+        self.data.totalSupply += params.amount*10000
 
     @sp.entry_point
     def burn(self, params):
@@ -58,10 +58,7 @@ class SmartCoin(sp.Contract):
         sp.if ~ self.data.balances.contains(address):
             self.data.balances[address] = sp.record(balance = 0, approvals = {})
 
-    @sp.entry_point
-    def ModifyCoinPrice(self,params):
-        sp.verify(sp.sender == self.data.administrator)
-        self.data.price = params.price 
+    
     
     # The following methods should be added too
     # def getBalance(self, params):
@@ -86,6 +83,6 @@ if "templates" not in __name__:
         scenario += c1
         scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
         scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
-        scenario += c1.ModifyCoinPrice(price=400).run(sender = admin)
+        
  
        
