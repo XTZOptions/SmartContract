@@ -9,6 +9,7 @@ class SmartCoin(sp.Contract):
         sp.verify((sp.sender == self.data.administrator) |
             (((params.fromAddr == sp.sender) |
                  (self.data.balances[params.fromAddr].approvals[sp.sender] >= params.amount))))
+        
         self.addAddressIfNecessary(params.toAddr)
         sp.verify(self.data.balances[params.fromAddr].balance >= params.amount)
         self.data.balances[params.fromAddr].balance -= params.amount
@@ -65,7 +66,7 @@ class SmartCoin(sp.Contract):
     # def getAdministrator(self, params):
 
 if "templates" not in __name__:
-    @sp.add_test(name = "SmartCoin")
+    @sp.add_test(name = "ALA Coin")
     def test():
 
         scenario = sp.test_scenario()
