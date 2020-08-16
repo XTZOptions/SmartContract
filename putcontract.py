@@ -9,6 +9,8 @@ class PutContract(sp.Contract):
     @sp.entry_point
     def putBuyer(self, params):
         sp.verify(~self.data.contractBuyer.contains(sp.sender))
+        sp.verify((params.strikePrice>0)&(params.options>0))
+        
         self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.strikePrice, pool = sp.map(),adminpayment =sp.nat(0),options=params.options)
         
 
@@ -36,7 +38,10 @@ def test():
     scenario = sp.test_scenario()
     c1 = PutContract(admin,100)
     scenario += c1
+    
     scenario += c1.putBuyer(strikePrice=100,options=5).run(sender=alice)
+    
     scenario += c1.modifyPrice(price=100).run(sender=admin)
+    
     scenario += c1.putSeller(amount=50000).run(sender=bob)
     scenario += c1.putSeller(amount=10000).run(sender=bob)
