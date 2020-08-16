@@ -26,7 +26,7 @@ class PutContract(sp.Contract):
             premiumCal = premiumCal/self.data.totalLiquidity
             self.data.liquidityPool[i].premium += premiumCal
             
-            CollateralCal = self.data.liquidityPool[i].amount*params.strikePrice*params.options
+            CollateralCal = self.data.liquidityPool[i].amount*params.strikePrice*params.options*100
             CollateralCal = CollateralCal/self.data.totalLiquidity
             self.data.contractBuyer[sp.sender].pool[i] = CollateralCal
         
