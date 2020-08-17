@@ -16,7 +16,7 @@ class PutContract(sp.Contract):
         totalAmount = params.strikePrice*params.options*100
         sp.verify(self.data.totalLiquidity > totalAmount)
         
-        self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.strikePrice, pool = sp.map(),adminpayment =sp.nat(0),options=params.options)
+        self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.strikePrice, pool = sp.map(),adminpayment =sp.int(0),options=params.options)
         
        
         premiumCal = 0  
@@ -29,6 +29,7 @@ class PutContract(sp.Contract):
             CollateralCal = self.data.liquidityPool[i].amount*params.strikePrice*params.options*100
             CollateralCal = CollateralCal/self.data.totalLiquidity
             self.data.contractBuyer[sp.sender].pool[i] = CollateralCal
+            
         
     @sp.entry_point
     def putSeller(self,params):
@@ -41,6 +42,17 @@ class PutContract(sp.Contract):
 
         self.data.totalLiquidity += params.amount
     
+
+    @sp.entry_point
+    def sellContract(self,params):
+        sp.verify(self.data.contractBuyer.contains(sp.sender))
+        sp.if self.data.contractBuyer[sp.sender].strikePrice > self.data.xtzPrice :
+            pass
+            # Transfer StrikePrice*Options*100 into account
+        sp.else: 
+            sp.for i in  self.data.contractBuyer[sp.sender].pool.keys():
+                self.data.liquidityPool[i].amount += self.data.contractBuyer[sp.sender].pool[i]
+ 
     @sp.entry_point
     def modifyPrice(self,params):
         sp.verify(sp.sender == self.data.administrator)
