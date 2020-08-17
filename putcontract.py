@@ -38,8 +38,8 @@ class PutContract(sp.Contract):
         sp.if self.data.liquidityPool.contains(sp.sender):
             self.data.liquidityPool[sp.sender].amount += params.amount
         sp.else: 
-            self.data.liquidityPool[sp.sender] = sp.record(amount=params.amount,premium=sp.nat(0))
-
+            self.data.liquidityPool[sp.sender] = sp.record(amount=sp.nat(0),premium=sp.nat(0))
+            self.data.liquidityPool[sp.sender].amount += params.amount
         self.data.totalLiquidity += params.amount
     
 
@@ -52,7 +52,19 @@ class PutContract(sp.Contract):
         sp.else: 
             sp.for i in  self.data.contractBuyer[sp.sender].pool.keys():
                 self.data.liquidityPool[i].amount += self.data.contractBuyer[sp.sender].pool[i]
- 
+    
+    @sp.entry_point
+    def resetContract(self,params):
+        # Add time verification case before deployment 
+        sp.verify(sp.sender == self.data.administrator)
+        sp.for i in self.data.contractBuyer.keys():
+            sp.if self.data.contractBuyer[i].strikePrice > self.data.xtzPrice:
+                pass
+                # External Contract Call to transfer amount
+            sp.else:
+                sp.for j in  self.data.contractBuyer[i].pool.keys():
+                    self.data.liquidityPool[j].amount += self.data.contractBuyer[i].pool[j]
+    
     @sp.entry_point
     def modifyPrice(self,params):
         sp.verify(sp.sender == self.data.administrator)
@@ -79,5 +91,5 @@ def test():
     scenario += c1.putBuyer(strikePrice=100,options=5,fee=100).run(sender=alice)
     
     scenario += c1.modifyPrice(price=100).run(sender=admin)
-    
+    scenario += c1.resetContract().run(sender=admin)
     
