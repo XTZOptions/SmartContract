@@ -1,6 +1,6 @@
 import smartpy as sp
 
-class SmartCoin(sp.Contract):
+class ALACoin(sp.Contract):
     def __init__(self, admin):
         self.init(balances = sp.big_map(), administrator = admin, totalSupply = 0)
 
@@ -51,7 +51,11 @@ class SmartCoin(sp.Contract):
         sp.verify(sp.sender == self.data.administrator)
         sp.verify(self.data.balances[params.address].balance >= params.amount)
         self.data.balances[params.address].balance -= params.amount
-        
+
+    @sp.entry_point
+    def UnlockPutMethod(self,params):
+        sp.verify(sp.sender == self.data.administrator)
+        self.data.balances[params.address].balance += params.amount
     
     def addAddressIfNecessary(self, address):
         sp.if ~ self.data.balances.contains(address):
@@ -70,19 +74,20 @@ if "templates" not in __name__:
     def test():
 
         scenario = sp.test_scenario()
-        scenario.h1("SmartCoin Contract")
+        scenario.h1("ALA Contract")
         value = 1
         admin = sp.address("tz123")
         alice = sp.address("tz1456")
         bob   = sp.address("tz1678")
 
 
-        c1 = SmartCoin(admin)
+        c1 = ALACoin(admin)
 
         scenario += c1
         scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
         scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
         scenario += c1.LockPutMethod(address = bob, amount = 10).run(sender = admin)
-        
+        scenario += c1.UnlockPutMethod(address = bob, amount = 10).run(sender = admin)
+               
  
        
