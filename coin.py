@@ -40,6 +40,13 @@ class ALACoin(sp.Contract):
         self.data.totalSupply += params.amount*10000
 
     @sp.entry_point
+    def withdraw(self):
+        sp.verify(self.data.balances.contains(sp.sender))
+        sp.send(sp.sender,sp.tez(1))
+
+        self.data.balances[sp.sender].balance = sp.to_int(self.data.balances[sp.sender].balance % 10000)
+    
+    @sp.entry_point
     def burn(self, params):
         sp.verify(sp.sender == self.data.administrator)
         sp.verify(self.data.balances[params.address].balance >= params.amount)
@@ -88,6 +95,7 @@ if "templates" not in __name__:
         scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
         scenario += c1.LockPutMethod(address = bob, amount = 10).run(sender = admin)
         scenario += c1.UnlockPutMethod(address = bob, amount = 10).run(sender = admin)
+        scenario += c1.withdraw().run(sender = bob)
                
  
        
