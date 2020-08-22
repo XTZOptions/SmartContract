@@ -68,34 +68,28 @@ class ALACoin(sp.Contract):
         sp.if ~ self.data.balances.contains(address):
             self.data.balances[address] = sp.record(balance = 0, approvals = {})
 
-    
-    
-    # The following methods should be added too
-    # def getBalance(self, params):
-    # def getAllowance(self, params):
-    # def getTotalSupply(self, params):
-    # def getAdministrator(self, params):
-
-if "templates" not in __name__:
-    @sp.add_test(name = "ALA Coin")
-    def test():
-
-        scenario = sp.test_scenario()
-        scenario.h1("ALA Contract")
-        value = 1
-        admin = sp.address("tz123")
-        alice = sp.address("tz1456")
-        bob   = sp.address("tz1678")
 
 
-        c1 = ALACoin(admin)
 
-        scenario += c1
-        scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
-        scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
-        scenario += c1.LockPutMethod(address = bob, amount = 10).run(sender = admin)
-        scenario += c1.UnlockPutMethod(address = bob, amount = 10).run(sender = admin)
-        scenario += c1.withdraw().run(sender = bob)
-               
- 
+@sp.add_test(name = "ALA Coin")
+def test():
+
+    scenario = sp.test_scenario()
+    scenario.h1("ALA Contract")
+    value = 1
+    admin = sp.address("tz123")
+    alice = sp.address("tz1456")
+    bob   = sp.address("tz1678")
+
+
+    c1 = ALACoin(admin)
+
+    scenario += c1
+    scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
+    scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
+    scenario += c1.LockPutMethod(address = bob, amount = 10).run(sender = admin)
+    scenario += c1.UnlockPutMethod(address = bob, amount = 10).run(sender = admin)
+    scenario += c1.withdraw().run(sender = bob)
+            
+
        

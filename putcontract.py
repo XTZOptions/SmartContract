@@ -4,8 +4,8 @@ class PutContract(sp.Contract):
     def __init__(self,admin,end_date):
 
         self.init(contractBuyer=sp.map(),liquidityPool=sp.map(),administrator = admin,
-        totalLiquidity=sp.nat(0),end_date=sp.timestamp(end_date),
-        xtzPrice=300,adminAccount=100000,tempcal=sp.nat(0))
+        totalLiquidity=0,end_date=sp.timestamp(end_date),
+        xtzPrice=300,adminAccount=100000,tempcal=0)
 
     @sp.entry_point
     def putBuyer(self, params):
@@ -16,7 +16,7 @@ class PutContract(sp.Contract):
         totalAmount = params.strikePrice*params.options*100
         sp.verify(self.data.totalLiquidity > totalAmount)
         
-        self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.strikePrice, pool = sp.map(),adminpayment =sp.int(0),options=params.options)
+        self.data.contractBuyer[sp.sender] = sp.record(strikePrice = sp.to_int(params.strikePrice), pool = sp.map(),adminpayment =0,options=sp.to_int(params.options))
         
        
         premiumCal = 0  
@@ -29,10 +29,12 @@ class PutContract(sp.Contract):
             
             CollateralCal = self.data.liquidityPool[i].amount*params.strikePrice*params.options*100
             CollateralCal = CollateralCal/self.data.totalLiquidity
+            
             self.data.contractBuyer[sp.sender].pool[i] = CollateralCal
+            self.data.liquidityPool[i] -= self.data.contractBuyer[sp.sender].pool[i]
             self.data.tempcal += CollateralCal
-
         
+        self.data.totalLiquidity -= self.data.tempcal
         
     @sp.entry_point
     def putSeller(self,params):
@@ -41,7 +43,7 @@ class PutContract(sp.Contract):
         sp.if self.data.liquidityPool.contains(sp.sender):
             self.data.liquidityPool[sp.sender].amount += params.amount
         sp.else: 
-            self.data.liquidityPool[sp.sender] = sp.record(amount=sp.nat(0),premium=sp.nat(0))
+            self.data.liquidityPool[sp.sender] = sp.record(amount=0,premium=0)
             self.data.liquidityPool[sp.sender].amount += params.amount
         self.data.totalLiquidity += params.amount
     
@@ -93,6 +95,6 @@ def test():
     
     scenario += c1.putBuyer(strikePrice=100,options=5,fee=100).run(sender=bob)
     
-    scenario += c1.modifyPrice(price=100).run(sender=admin)
-    scenario += c1.resetContract().run(sender=admin)
+    # scenario += c1.modifyPrice(price=100).run(sender=admin)
+    # scenario += c1.resetContract().run(sender=admin)
     
