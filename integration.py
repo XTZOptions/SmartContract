@@ -2,7 +2,7 @@ import smartpy as sp
 
 class ALACoin(sp.Contract):
     def __init__(self, admin):
-        self.init(balances = sp.big_map(), administrator = admin, totalSupply = 0,Contract=sp.big_map())
+        self.init(balances = sp.big_map(), administrator = admin, totalSupply = 0,contract= sp.big_map())
 
     @sp.entry_point
     def transfer(self, params):
@@ -67,13 +67,11 @@ class ALACoin(sp.Contract):
     @sp.entry_point
     def AddContract(self,params):
         sp.verify(sp.sender == self.data.administrator)
-        self.data.contract[params] = 1
+        self.data.contract[params] = 1  
 
     def addAddressIfNecessary(self, address):
         sp.if ~ self.data.balances.contains(address):
             self.data.balances[address] = sp.record(balance = 0, approvals = {})
-
-
 
 
 @sp.add_test(name = "ALA Coin")
@@ -95,6 +93,6 @@ def test():
     scenario += c1.LockToken(address = bob, amount = 10).run(sender = admin)
     scenario += c1.UnlockToken(address = bob, amount = 10).run(sender = admin)
     scenario += c1.withdraw().run(sender = bob)
-            
+    scenario += c1.AddContract(alice).run(sender=admin)
 
        
