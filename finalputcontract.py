@@ -7,7 +7,7 @@ class PutOptions(sp.Contract):
         self.init(contractBuyer= sp.big_map(),contractSellar = sp.big_map(),
         administrator = admin,buyerSet = sp.set(),poolSet=sp.set(),
             xtzPrice=300,validation=sp.record(cycleEnd=sp.timestamp(endCycle),withdrawTime=sp.timestamp(endWithdraw),totalSupply=sp.nat(0)),
-            tokenContract=sp.none
+            tokenContract=sp.none,adminAccount=10000
         )
 
 
@@ -16,7 +16,9 @@ class PutOptions(sp.Contract):
 
         sp.verify(sp.now < self.data.validation.cycleEnd)
         sp.verify(~ self.data.contractBuyer.contains(sp.sender))
-    
+        sp.verify(params.fee >= 100)
+
+        self.data.adminAccount += params.fee
         self.data.buyerSet.add(sp.sender)
         value = sp.now.add_hours(5)
 
@@ -33,8 +35,9 @@ class PutOptions(sp.Contract):
 
             self.data.contractSellar[i].amount = abs(self.data.contractSellar[i].amount - (self.data.contractSellar[i].amount*TotalAmount.value)/self.data.validation.totalSupply)
 
-        sp.if CollateralTotal.value !=  params.strikePrice*params.options : 
+        sp.if CollateralTotal.value !=  params.strikePrice*params.options: 
             self.data.contractBuyer[sp.sender].adminpayment = params.strikePrice*params.options - CollateralTotal.value
+            self.data.adminAccount = self.data.adminAccount - self.data.contractBuyer[sp.sender].adminpayment
             self.data.validation.totalSupply = abs(self.data.validation.totalSupply - CollateralTotal.value)
 
     @sp.entry_point
@@ -88,12 +91,10 @@ class PutOptions(sp.Contract):
             sp.for j in self.data.contractBuyer[i].pool.keys():
                 self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
                 
-
+            self.data.adminAccount += self.data.contractBuyer[i].adminpayment
             self.data.buyerSet.remove(i)
             del self.data.contractBuyer[i]
             
-                
-
 
     @sp.entry_point
     def ModifyPrice(self,params):
@@ -119,4 +120,4 @@ def test():
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alice)
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alex)
     
-    scenario += c1.putBuyer(strikePrice=10,options=5,expiry=65).run(now=50,sender=bob)
+    scenario += c1.putBuyer(strikePrice=10,options=5,expiry=65,fee=100).run(now=50,sender=bob)
