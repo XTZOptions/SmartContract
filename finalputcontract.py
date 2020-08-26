@@ -85,25 +85,14 @@ class PutOptions(sp.Contract):
 
         sp.for i in self.data.buyerSet.elements():
 
-            sp.if self.data.xtzPrice < self.data.contractBuyer[i].strikePrice: 
-
-                # Pass amount to the token amount 
-                #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "LockToken").open_some()
-                #mydata = sp.record(address = sp.sender,amount=params.amount)
-                #sp.transfer(mydata, sp.mutez(0), c)
-                self.data.buyerSet.remove(i)
-                del self.data.contractBuyer[i]
-
-            sp.else: 
-
-                sp.for j in self.data.contractBuyer[i].pool.keys():
-                    self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
-                    
-
-                self.data.buyerSet.remove(i)
-                del self.data.contractBuyer[i]
+            sp.for j in self.data.contractBuyer[i].pool.keys():
+                self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
                 
-                self.data.adminpayment
+
+            self.data.buyerSet.remove(i)
+            del self.data.contractBuyer[i]
+            
+                
 
 
     @sp.entry_point
