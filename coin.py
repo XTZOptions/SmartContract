@@ -55,13 +55,13 @@ class ALACoin(sp.Contract):
 
     @sp.entry_point
     def LockToken(self,params):
-        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(self.data.contract.contains(sp.sender))
         sp.verify(self.data.balances[params.address].balance >= params.amount)
         self.data.balances[params.address].balance -= params.amount
 
     @sp.entry_point
     def UnlockToken(self,params):
-        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(self.data.contract.contains(sp.sender))
         self.data.balances[params.address].balance += params.amount
     
     @sp.entry_point
@@ -72,7 +72,6 @@ class ALACoin(sp.Contract):
     def addAddressIfNecessary(self, address):
         sp.if ~ self.data.balances.contains(address):
             self.data.balances[address] = sp.record(balance = 0, approvals = {})
-
 
 
 
@@ -92,10 +91,10 @@ def test():
     scenario += c1
     scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
     scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
-    scenario += c1.LockToken(address = bob, amount = 10).run(sender = admin)
-    scenario += c1.UnlockToken(address = bob, amount = 10).run(sender = admin)
-    scenario += c1.withdraw().run(sender = bob)
+    
+    
     scenario += c1.AddContract(bob).run(sender=admin)
-            
+    scenario += c1.LockToken(address = bob, amount = 10).run(sender = bob)
+    scenario += c1.UnlockToken(address = bob, amount = 10).run(sender = bob)
 
-       
+    scenario += c1.withdraw().run(sender = bob)
