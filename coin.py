@@ -2,7 +2,7 @@ import smartpy as sp
 
 class ALACoin(sp.Contract):
     def __init__(self, admin):
-        self.init(balances = sp.big_map(), administrator = admin, totalSupply = 0)
+        self.init(balances = sp.big_map(), administrator = admin, totalSupply = 0,contract= sp.set([admin]))
 
     @sp.entry_point
     def transfer(self, params):
@@ -54,15 +54,20 @@ class ALACoin(sp.Contract):
         self.data.totalSupply -= params.amount
 
     @sp.entry_point
-    def LockPutMethod(self,params):
+    def LockToken(self,params):
         sp.verify(sp.sender == self.data.administrator)
         sp.verify(self.data.balances[params.address].balance >= params.amount)
         self.data.balances[params.address].balance -= params.amount
 
     @sp.entry_point
-    def UnlockPutMethod(self,params):
+    def UnlockToken(self,params):
         sp.verify(sp.sender == self.data.administrator)
         self.data.balances[params.address].balance += params.amount
+    
+    @sp.entry_point
+    def AddContract(self,params):
+        sp.verify(sp.sender == self.data.administrator)
+        self.data.contract.add(params)  
     
     def addAddressIfNecessary(self, address):
         sp.if ~ self.data.balances.contains(address):
@@ -87,9 +92,10 @@ def test():
     scenario += c1
     scenario += c1.mint(address = alice, amount = 12).run(sender = alice,amount = sp.tez(12))
     scenario += c1.mint(address = bob, amount = 10).run(sender = alice,amount = sp.tez(10))
-    scenario += c1.LockPutMethod(address = bob, amount = 10).run(sender = admin)
-    scenario += c1.UnlockPutMethod(address = bob, amount = 10).run(sender = admin)
+    scenario += c1.LockToken(address = bob, amount = 10).run(sender = admin)
+    scenario += c1.UnlockToken(address = bob, amount = 10).run(sender = admin)
     scenario += c1.withdraw().run(sender = bob)
+    scenario += c1.AddContract(bob).run(sender=admin)
             
 
        
