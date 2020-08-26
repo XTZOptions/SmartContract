@@ -35,7 +35,7 @@
 
             sp.if CollateralTotal.value !=  params.strikePrice*params.options : 
                 self.data.contractBuyer[sp.sender].adminpayment = params.strikePrice*params.options - CollateralTotal.value
-                self.data.validation.totalSupply = abs(self.data.validation.totalSupply - (params.strikePrice*params.options - CollateralTotal.value))
+                self.data.validation.totalSupply = abs(self.data.validation.totalSupply - CollateralTotal.value)
 
         @sp.entry_point
         def putSeller(self,params):
