@@ -1,8 +1,9 @@
 import smartpy as sp
 
-class FA12(sp.Contract):
+class ALAToken(sp.Contract):
     def __init__(self, admin):
-        self.init(paused = False, ledger = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat)), administrator = admin, totalSupply = 0)
+        self.init(paused = False, ledger = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat)), administrator = admin, totalSupply = 0
+        ,contract= sp.set([admin]))
 
     @sp.entry_point
     def transfer(self, params):
@@ -40,11 +41,12 @@ class FA12(sp.Contract):
 
     @sp.entry_point
     def mint(self, params):
-        sp.set_type(params, sp.TRecord(address = sp.TAddress, value = sp.TNat))
-        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(params.value>0)
+        tezValue=sp.tez(sp.as_nat(params.value))
+        sp.verify(sp.amount == tezValue)
         self.addAddressIfNecessary(params.address)
-        self.data.ledger[params.address].balance += params.value
-        self.data.totalSupply += params.value
+        self.data.ledger[params.address].balance += abs(params.value*10000)
+        self.data.totalSupply += abs(params.value*10000)
 
     @sp.entry_point
     def burn(self, params):
@@ -57,6 +59,25 @@ class FA12(sp.Contract):
     def addAddressIfNecessary(self, address):
         sp.if ~ self.data.ledger.contains(address):
             self.data.ledger[address] = sp.record(balance = 0, approvals = {})
+
+
+    @sp.entry_point
+    def AddContract(self,params):
+        sp.verify(sp.sender == self.data.administrator)
+        self.data.contract.add(params) 
+
+    @sp.entry_point
+    def LockToken(self,params):
+        sp.verify(self.data.contract.contains(sp.sender))
+        sp.verify(self.data.ledger.contains(params.address))
+        sp.verify(self.data.ledger[params.address].balance >= params.amount)
+        self.data.ledger[params.address].balance = abs(self.data.ledger[params.address].balance - params.amount)
+
+    @sp.entry_point
+    def UnlockToken(self,params):
+        sp.verify(self.data.contract.contains(sp.sender))
+        sp.verify(self.data.ledger.contains(params.address))
+        self.data.ledger[params.address].balance += params.amount
 
     @sp.view(sp.TNat)
     def getBalance(self, params):
@@ -85,7 +106,7 @@ class Viewer(sp.Contract):
         self.data.last = sp.some(params)
 
 if "templates" not in __name__:
-    @sp.add_test(name = "FA12")
+    @sp.add_test(name = "ALA Token")
     def test():
 
         scenario = sp.test_scenario()
@@ -102,12 +123,15 @@ if "templates" not in __name__:
        
 
         scenario.h1("Contract")
-        c1 = FA12(admin)
+        c1 = ALAToken(admin)
 
         scenario.h1("Entry points")
         scenario += c1
         scenario.h2("Admin mints a few coins")
-        scenario += c1.mint(address = alice.address, value = 12).run(sender = admin)
-        scenario += c1.mint(address = alice.address, value = 3).run(sender = admin)
-        scenario += c1.mint(address = alice.address, value = 3).run(sender = admin)
+        scenario += c1.mint(address = alice.address, value = 12).run(sender = alice,amount = sp.tez(12))
+        scenario += c1.mint(address = bob.address, value = 3).run(sender = admin,amount=sp.tez(3))
+        # scenario += c1.mint(address = alice.address, value = 3).run(sender = admin)
+        scenario += c1.AddContract(alice.address).run(sender=admin)
+        scenario += c1.UnlockToken(address=bob.address,amount=100).run(sender=alice)
+        scenario += c1.LockToken(address=bob.address,amount=100).run(sender=alice)
         
