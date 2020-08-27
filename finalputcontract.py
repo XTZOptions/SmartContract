@@ -2,12 +2,12 @@ import smartpy as sp
 
 class PutOptions(sp.Contract):
 
-    def __init__(self,admin,endCycle,endWithdraw):
+    def __init__(self,admin,endCycle,endWithdraw,token):
 
         self.init(contractBuyer= sp.big_map(),contractSellar = sp.big_map(),
         administrator = admin,buyerSet = sp.set(),poolSet=sp.set(),
             xtzPrice=300,validation=sp.record(cycleEnd=sp.timestamp(endCycle),withdrawTime=sp.timestamp(endWithdraw),totalSupply=sp.nat(0)),
-            tokenContract=sp.none,adminAccount=10000
+            tokenContract=token,adminAccount=10000
         )
 
 
@@ -104,8 +104,9 @@ class PutOptions(sp.Contract):
 @sp.add_test(name = "Put Contract Testing")
 def test():
     
-    admin = sp.address("tz123")
+    admin = sp.address("tz1hPnEdcKWrdeZEAQiGfmV6knHA5En1fCwQ")
     # Put Buyers    
+    token = sp.address("KT1XKqN7zAKHTYa8ck36Gc8ti4PeRKWa9v8P")
     bob   = sp.address("tz1678")
     
     # Put Sellers
@@ -113,7 +114,7 @@ def test():
     alex = sp.address("tz1910")
 
     scenario = sp.test_scenario()
-    c1 =  PutOptions(admin,100,120)
+    c1 =  PutOptions(admin,100,120,token)
     scenario += c1
 
     scenario += c1.putSeller(amount=50000).run(now=45,sender=alice)
