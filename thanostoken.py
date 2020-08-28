@@ -79,6 +79,15 @@ class ALAToken(sp.Contract):
         sp.verify(self.data.ledger.contains(params.address))
         self.data.ledger[params.address].balance += params.amount
 
+    @sp.entry_point
+    def withdrawToken(self,params):
+        sp.verify(params.amount > 0)
+        sp.verify(self.data.ledger.contains(sp.sender))
+        sp.verify(self.data.ledger[sp.sender].balance >= params.amount)
+        self.data.ledger[sp.sender].balance = sp.as_nat(self.data.ledger[sp.sender].balance - params.amount)
+        self.data.totalSupply = sp.as_nat(self.data.totalSupply - params.amount)
+        sp.send(sp.sender,sp.mutez(params.amount*100))
+        
     @sp.view(sp.TNat)
     def getBalance(self, params):
         sp.result(self.data.ledger[params].balance)
@@ -134,4 +143,4 @@ if "templates" not in __name__:
         scenario += c1.AddContract(alice.address).run(sender=admin)
         scenario += c1.UnlockToken(address=bob.address,amount=100).run(sender=alice)
         scenario += c1.LockToken(address=bob.address,amount=100).run(sender=alice)
-        
+        scenario += c1.withdrawToken(amount=120000).run(sender=alice)
