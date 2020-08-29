@@ -29,8 +29,6 @@ class PutOptions(sp.Contract):
         TotalAmount = sp.local('TotalAmount',params.StrikePrice*params.Options*100)
 
         Interest = sp.local('Interest',self.data.model[params.StrikePrice*100][params.expire])
-
-        
         
         Deadline = sp.now.add_days(params.expire)
         
@@ -49,17 +47,19 @@ class PutOptions(sp.Contract):
         self.data.adminAccount += params.StrikePrice*params.Options
         self.data.buyerSet.add(sp.sender)
 
-        value = sp.now.add_days(params.expire)
-
         
         CollateralTotal = sp.local('CollateralTotal',0)
 
 
         PremiumCal =  sp.local('PremiumCal',params.StrikePrice*params.Options*Interest.value)
-        PremiumTotal = sp.local('PremiumTotal',0)
+        
+        sp.if params.StrikePrice > self.data.xtzPrice: 
+            PremiumCal.value += abs((params.StrikePrice - self.data.xtzPrice)*100)
 
+        PremiumTotal = sp.local('PremiumTotal',0)
+        sp.transfer(sp.sender,PremiumCal)
         self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.StrikePrice, pool = sp.map(),adminpayment =0,options=params.Options,
-        expiry=value)
+        expiry=Deadline)
 
         sp.for i in self.data.poolSet.elements():
             self.data.contractBuyer[sp.sender].pool[i] = (self.data.contractSellar[i].amount*TotalAmount.value)/self.data.validation.totalSupply 
@@ -72,8 +72,6 @@ class PutOptions(sp.Contract):
             self.data.contractSellar[i].amount = abs(self.data.contractSellar[i].amount - (self.data.contractSellar[i].amount*TotalAmount.value)/self.data.validation.totalSupply)
             
             
-
-
         self.data.adminAccount += abs(PremiumCal.value - PremiumTotal.value)
         self.data.validation.totalSupply = abs(self.data.validation.totalSupply - CollateralTotal.value)
 
@@ -97,7 +95,7 @@ class PutOptions(sp.Contract):
         sp.if self.data.poolSet.contains(sp.sender):
 
             self.data.contractSellar[sp.sender].amount += params.amount
-        
+
         sp.else:
 
             self.data.poolSet.add(sp.sender) 
@@ -108,7 +106,8 @@ class PutOptions(sp.Contract):
         self.data.validation.totalSupply += params.amount
             
     @sp.entry_point
-    def sellPut(self):
+    def ReleaseContract(self):
+        
         sp.verify(sp.now < self.data.validation.cycleEnd)
         sp.verify(self.data.contractBuyer.contains(sp.sender))
 
@@ -119,6 +118,14 @@ class PutOptions(sp.Contract):
             #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "UnlockToken").open_some()
             #mydata = sp.record(address = sp.sender,amount=params.amount)
             #sp.transfer(mydata, sp.mutez(0), c)
+
+            Amount = sp.local('Amount',(self.data.contractBuyer[sp.sender].strikePrice - self.data.xtzPrice)*100)
+            PoolAmount = sp.local('PoolAmount',(self.data.contractBuyer[sp.sender].strikePrice*self.data.contractBuyer[sp.sender].options)*100 - self.data.contractBuyer[sp.sender].adminpayment)
+
+            sp.for i in  self.data.contractBuyer[sp.sender].pool.keys():
+                pass
+
+
             self.data.buyerSet.remove(sp.sender)
             del self.data.contractBuyer[sp.sender]
 
