@@ -17,7 +17,7 @@ class PutOptions(sp.Contract):
         sp.verify(sp.now < self.data.validation.cycleEnd)
         sp.verify(~ self.data.contractBuyer.contains(sp.sender))
         
-        self.data.model[self.data.xtzPrice*9] = {7:1,14:2,21:4}
+        self.data.model[self.data.xtzPrice*90] = {7:1,14:2,21:4}
         self.data.model[self.data.xtzPrice*95] = {7:2,14:4,21:8}
         self.data.model[self.data.xtzPrice*100] = {7:4,14:8,21:16}
         self.data.model[self.data.xtzPrice*105] = {7:2,14:4,21:8}
@@ -36,7 +36,7 @@ class PutOptions(sp.Contract):
 
 
         # Deleting Pricing Model 
-        del self.data.model[self.data.xtzPrice*9]
+        del self.data.model[self.data.xtzPrice*90]
         del self.data.model[self.data.xtzPrice*95]
         del self.data.model[self.data.xtzPrice*100]
         del self.data.model[self.data.xtzPrice*105]
@@ -57,7 +57,7 @@ class PutOptions(sp.Contract):
             PremiumCal.value += abs((params.StrikePrice - self.data.xtzPrice)*100)
 
         PremiumTotal = sp.local('PremiumTotal',0)
-        sp.transfer(sp.sender,PremiumCal)
+        sp.send(sp.sender,sp.tez(PremiumCal.value))
         self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.StrikePrice, pool = sp.map(),adminpayment =0,options=params.Options,
         expiry=Deadline)
 
@@ -182,8 +182,8 @@ def test():
     c1 =  PutOptions(admin,100,120,token)
     scenario += c1
 
-    scenario += c1.putSeller(amount=50000).run(now=45,sender=alice)
+    scenario += c1.putSeller(amount=50000).run(now=45,sender=alice,amount=sp.tez(10000))
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alice)
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alex)
     
-    scenario += c1.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob)
+    scenario += c1.putBuyer(StrikePrice=360,Options=1,expire=14).run(now=50,sender=bob)
