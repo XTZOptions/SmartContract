@@ -41,8 +41,6 @@ class PutOptions(sp.Contract):
         del self.data.model[self.data.xtzPrice*100]
         del self.data.model[self.data.xtzPrice*105]
         del self.data.model[self.data.xtzPrice*110]
-        
-
 
         self.data.adminAccount += params.StrikePrice*params.Options
         self.data.buyerSet.add(sp.sender)
@@ -57,7 +55,7 @@ class PutOptions(sp.Contract):
             PremiumCal.value += abs((params.StrikePrice - self.data.xtzPrice)*100)
 
         PremiumTotal = sp.local('PremiumTotal',0)
-        sp.send(sp.sender,sp.tez(PremiumCal.value))
+
         self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.StrikePrice, pool = sp.map(),adminpayment =0,options=params.Options,
         expiry=Deadline)
 
@@ -122,6 +120,9 @@ class PutOptions(sp.Contract):
             Amount = sp.local('Amount',(self.data.contractBuyer[sp.sender].strikePrice - self.data.xtzPrice)*100)
             PoolAmount = sp.local('PoolAmount',(self.data.contractBuyer[sp.sender].strikePrice*self.data.contractBuyer[sp.sender].options)*100 - self.data.contractBuyer[sp.sender].adminpayment)
 
+            #sp.send(sp.sender,sp.tez(Amount.value))
+
+
             sp.for i in  self.data.contractBuyer[sp.sender].pool.keys():
                 pass
 
@@ -131,18 +132,17 @@ class PutOptions(sp.Contract):
 
     @sp.entry_point
     def ResetContract(self):
-        
-        sp.verify(sp.sender == self.data.administrator)
-        sp.verify(sp.now >  self.data.validation.cycleEnd)
 
         sp.for i in self.data.buyerSet.elements():
 
-            sp.for j in self.data.contractBuyer[i].pool.keys():
-                self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
+            sp.if sp.now > self.data.contractBuyer[i].expiry: 
+
+                sp.for j in self.data.contractBuyer[i].pool.keys():
+                    self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
                 
-            self.data.adminAccount += self.data.contractBuyer[i].adminpayment
-            self.data.buyerSet.remove(i)
-            del self.data.contractBuyer[i]
+                self.data.adminAccount += self.data.contractBuyer[i].adminpayment
+                self.data.buyerSet.remove(i)
+                del self.data.contractBuyer[i]
             
             
     @sp.entry_point
