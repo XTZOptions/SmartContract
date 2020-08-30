@@ -124,7 +124,6 @@ class Viewer(sp.Contract):
     def target(self, params):
         self.data.last = sp.some(params)
 
-import smartpy as sp
 
 class PutOptions(sp.Contract):
 
@@ -261,7 +260,7 @@ class PutOptions(sp.Contract):
                 self.data.adminAccount = abs( self.data.adminAccount - abs(abs(Amount.value) - TotalCal.value)) 
 
             sp.send(sp.sender,sp.tez(abs(Amount.value)))
-
+            self.Unlock(sp.sender,abs(Amount.value))
             self.data.buyerSet.remove(sp.sender)
             del self.data.contractBuyer[sp.sender]
 
@@ -327,12 +326,12 @@ def test():
     scenario += c2
     
     scenario += c1.AddContract(c2.address).run(sender=admin)
-    scenario += c1.mint(address = alice.address, value = 20).run(sender = alice,amount = sp.tez(20))
+    scenario += c1.mint(address = alice.address, value = 2).run(sender = alice,amount = sp.tez(2))
 
-    scenario += c2.putSeller(amount=50000).run(now=45,sender=alice)
-    # scenario += c2.putSeller(amount=50000).run(now=45,sender=alex)
-
-    scenario += c1.mint(address = bob.address, value = 10).run(sender = bob,amount = sp.tez(10))
+    scenario += c2.putSeller(amount=50000).run(now=45,sender=alice,amount=sp.tez(100000))
+    
+    scenario += c1.mint(address = bob.address, value = 1).run(sender = bob,amount = sp.tez(1))
 
     scenario += c2.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob)
-    
+    scenario += c2.ModifyPrice(price=300).run(sender=admin)
+    scenario += c2.ReleaseContract().run(sender=bob)
