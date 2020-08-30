@@ -1,100 +1,197 @@
 import smartpy as sp
 
-class PutContract(sp.Contract):
-    def __init__(self,admin,end_date):
+class PutOptions(sp.Contract):
 
-        self.init(contractBuyer=sp.map(),liquidityPool=sp.map(),administrator = admin,
-        totalLiquidity=0,end_date=sp.timestamp(end_date),
-        xtzPrice=300,adminAccount=100000,tempcal=0)
+    def __init__(self,admin,endCycle,endWithdraw,token):
+
+        self.init(contractBuyer= sp.big_map(),contractSellar = sp.big_map(),
+        administrator = admin,buyerSet = sp.set(),poolSet=sp.set(),
+            xtzPrice=400,validation=sp.record(cycleEnd=sp.timestamp(endCycle),withdrawTime=sp.timestamp(endWithdraw),totalSupply=sp.nat(0)),
+            tokenContract=token,adminAccount=0,model = sp.map()
+        )
+
 
     @sp.entry_point
-    def putBuyer(self, params):
+    def putBuyer(self,params):
 
-        sp.verify(~self.data.contractBuyer.contains(sp.sender))
-        sp.verify((params.strikePrice>0)&(params.options>0)&(params.fee > 0))
+        sp.verify(sp.now < self.data.validation.cycleEnd)
+        sp.verify(~ self.data.contractBuyer.contains(sp.sender))
+        
+        self.data.model[self.data.xtzPrice*90] = {7:1,14:2,21:4}
+        self.data.model[self.data.xtzPrice*95] = {7:2,14:4,21:8}
+        self.data.model[self.data.xtzPrice*100] = {7:4,14:8,21:16}
+        self.data.model[self.data.xtzPrice*105] = {7:2,14:4,21:8}
+        self.data.model[self.data.xtzPrice*110] = {7:1,14:2,21:4}
 
-        totalAmount = params.strikePrice*params.options*100
-        sp.verify(self.data.totalLiquidity > totalAmount)
+        sp.verify(self.data.model.contains(params.StrikePrice*100))
+        sp.verify(self.data.model[params.StrikePrice*100].contains(params.expire))
         
-        self.data.contractBuyer[sp.sender] = sp.record(strikePrice = sp.to_int(params.strikePrice), pool = sp.map(),adminpayment =0,options=sp.to_int(params.options))
+        TotalAmount = sp.local('TotalAmount',params.StrikePrice*params.Options*100)
+
+        Interest = sp.local('Interest',self.data.model[params.StrikePrice*100][params.expire])
         
+        Deadline = sp.now.add_days(params.expire)
+        
+        # Transfer Token to the Contract 
+
+
+        # Deleting Pricing Model 
+        del self.data.model[self.data.xtzPrice*90]
+        del self.data.model[self.data.xtzPrice*95]
+        del self.data.model[self.data.xtzPrice*100]
+        del self.data.model[self.data.xtzPrice*105]
+        del self.data.model[self.data.xtzPrice*110]
+        
+
+
+        self.data.adminAccount += params.StrikePrice*params.Options
+        self.data.buyerSet.add(sp.sender)
+
+        
+        CollateralTotal = sp.local('CollateralTotal',0)
+
+
+        PremiumCal =  sp.local('PremiumCal',params.StrikePrice*params.Options*Interest.value)
+        
+        sp.if params.StrikePrice > self.data.xtzPrice: 
+            PremiumCal.value += abs((params.StrikePrice - self.data.xtzPrice)*100)
+
+        PremiumTotal = sp.local('PremiumTotal',0)
        
-        premiumCal = 0  
-        CollateralCal = 0 
-        self.data.tempcal = 0 
-        sp.for i in self.data.liquidityPool.keys():
-            premiumCal = self.data.liquidityPool[i].amount*params.fee 
-            premiumCal = premiumCal/self.data.totalLiquidity
-            self.data.liquidityPool[i].premium += premiumCal
+        self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.StrikePrice, pool = sp.map(),adminpayment =0,options=params.Options,
+        expiry=Deadline)
+
+        sp.for i in self.data.poolSet.elements():
+            self.data.contractBuyer[sp.sender].pool[i] = (self.data.contractSellar[i].amount*TotalAmount.value)/self.data.validation.totalSupply 
             
-            CollateralCal = self.data.liquidityPool[i].amount*params.strikePrice*params.options*100
-            CollateralCal = CollateralCal/self.data.totalLiquidity
+            CollateralTotal.value += self.data.contractBuyer[sp.sender].pool[i]
             
-            self.data.contractBuyer[sp.sender].pool[i] = CollateralCal
-            self.data.liquidityPool[i] -= self.data.contractBuyer[sp.sender].pool[i]
-            self.data.tempcal += CollateralCal
-        
-        self.data.totalLiquidity -= self.data.tempcal
-        
+            self.data.contractSellar[i].premium += (self.data.contractSellar[i].amount*PremiumCal.value)/self.data.validation.totalSupply 
+            PremiumTotal.value += (self.data.contractSellar[i].amount*PremiumCal.value)/self.data.validation.totalSupply 
+            
+            self.data.contractSellar[i].amount = abs(self.data.contractSellar[i].amount - (self.data.contractSellar[i].amount*TotalAmount.value)/self.data.validation.totalSupply)
+            
+            
+        self.data.adminAccount += abs(PremiumCal.value - PremiumTotal.value)
+        self.data.validation.totalSupply = abs(self.data.validation.totalSupply - CollateralTotal.value)
+
+        sp.if CollateralTotal.value !=  params.StrikePrice*params.Options*100: 
+            self.data.contractBuyer[sp.sender].adminpayment = abs(params.StrikePrice*params.Options*100 - CollateralTotal.value)
+            self.data.adminAccount = abs(self.data.adminAccount - self.data.contractBuyer[sp.sender].adminpayment)
+            
+
     @sp.entry_point
     def putSeller(self,params):
-        sp.verify(params.amount >= 10000 )
         
-        sp.if self.data.liquidityPool.contains(sp.sender):
-            self.data.liquidityPool[sp.sender].amount += params.amount
-        sp.else: 
-            self.data.liquidityPool[sp.sender] = sp.record(amount=0,premium=0)
-            self.data.liquidityPool[sp.sender].amount += params.amount
-        self.data.totalLiquidity += params.amount
-    
+        sp.verify(sp.now < self.data.validation.cycleEnd)
+        sp.verify(params.amount >= 10000)
+        sp.verify(params.amount %10000 == 0 )
+        # Token Contract Call 
+
+        #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "LockToken").open_some()
+        #mydata = sp.record(address = sp.sender,amount=params.amount)
+        #sp.transfer(mydata, sp.mutez(0), c)
+
+        sp.if self.data.poolSet.contains(sp.sender):
+
+            self.data.contractSellar[sp.sender].amount += params.amount
+
+        sp.else:
+
+            self.data.poolSet.add(sp.sender) 
+
+            self.data.contractSellar[sp.sender] = sp.record(amount=0,premium=0)
+            self.data.contractSellar[sp.sender].amount += params.amount
+
+        self.data.validation.totalSupply += params.amount
+            
+    @sp.entry_point
+    def ReleaseContract(self):
+        
+        sp.verify(sp.now < self.data.validation.cycleEnd)
+        sp.verify(self.data.contractBuyer.contains(sp.sender))
+
+        sp.verify(sp.now < self.data.contractBuyer[sp.sender].expiry)
+
+        sp.if self.data.contractBuyer[sp.sender].strikePrice > self.data.xtzPrice:  
+            # Pass amount to the token amount 
+            #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "UnlockToken").open_some()
+            #mydata = sp.record(address = sp.sender,amount=params.amount)
+            #sp.transfer(mydata, sp.mutez(0), c)
+
+            Amount = sp.local('Amount',(self.data.contractBuyer[sp.sender].strikePrice - self.data.xtzPrice)*100)
+            PoolAmount = sp.local('PoolAmount',(self.data.contractBuyer[sp.sender].strikePrice*self.data.contractBuyer[sp.sender].options)*100 - self.data.contractBuyer[sp.sender].adminpayment)
+
+            TotalCal =  sp.local('TotalCal',0)
+
+            sp.for i in  self.data.contractBuyer[sp.sender].pool.keys():
+                TotalCal.value += (self.data.contractBuyer[sp.sender].pool[i]*abs(Amount.value))/abs(PoolAmount.value)
+                self.data.contractBuyer[sp.sender].pool[i] = abs(self.data.contractBuyer[sp.sender].pool[i] - (self.data.contractBuyer[sp.sender].pool[i]*abs(Amount.value))/abs(PoolAmount.value)) 
+            
+                self.data.contractSellar[i].amount += self.data.contractBuyer[sp.sender].pool[i]
+
+            sp.send(sp.sender,sp.tez(TotalCal.value))
+            self.data.buyerSet.remove(sp.sender)
+            del self.data.contractBuyer[sp.sender]
 
     @sp.entry_point
-    def sellContract(self,params):
-        sp.verify(self.data.contractBuyer.contains(sp.sender))
-        sp.if self.data.contractBuyer[sp.sender].strikePrice > self.data.xtzPrice :
-            pass
-            # Transfer StrikePrice*Options*100 into account
-        sp.else: 
-            sp.for i in  self.data.contractBuyer[sp.sender].pool.keys():
-                self.data.liquidityPool[i].amount += self.data.contractBuyer[sp.sender].pool[i]
-    
-    @sp.entry_point
-    def resetContract(self,params):
-        # Add time verification case before deployment 
+    def ResetContract(self):
+        
         sp.verify(sp.sender == self.data.administrator)
-        sp.for i in self.data.contractBuyer.keys():
-            sp.if self.data.contractBuyer[i].strikePrice > self.data.xtzPrice:
-                pass
-                # External Contract Call to transfer amount
-            sp.else:
-                sp.for j in  self.data.contractBuyer[i].pool.keys():
-                    self.data.liquidityPool[j].amount += self.data.contractBuyer[i].pool[j]
-    
+        sp.verify(sp.now >  self.data.validation.cycleEnd)
+
+        sp.for i in self.data.buyerSet.elements():
+
+            sp.for j in self.data.contractBuyer[i].pool.keys():
+                self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
+                
+            self.data.adminAccount += self.data.contractBuyer[i].adminpayment
+            self.data.buyerSet.remove(i)
+            del self.data.contractBuyer[i]
+            
+            
     @sp.entry_point
-    def modifyPrice(self,params):
+    def WithdrawToken(self,params):
+        
+        sp.verify(sp.now > self.data.validation.cycleEnd)
+        sp.verify(sp.now < self.data.validation.withdrawTime)
+        sp.verify(self.data.contractSellar.contains(sp.sender))
+
+        # Pass amount to the token amount 
+        #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "UnlockToken").open_some()
+        #mydata = sp.record(address = sp.sender,amount=params.amount)
+        #sp.transfer(mydata, sp.mutez(0), c)
+        self.data.poolSet.remove(sp.sender)
+        del self.data.contractSellar[sp.sender]
+
+
+
+    @sp.entry_point
+    def ModifyPrice(self,params):
         sp.verify(sp.sender == self.data.administrator)
         self.data.xtzPrice = params.price
 
 @sp.add_test(name = "Put Contract Testing")
 def test():
     
-    admin = sp.address("tz123")
-    # Put Buyers
-    alice = sp.address("tz1456")
-    # Put Sellers
+    admin = sp.address("tz1hPnEdcKWrdeZEAQiGfmV6knHA5En1fCwQ")
+    # Put Buyers    
+    token = sp.address("KT1XKqN7zAKHTYa8ck36Gc8ti4PeRKWa9v8P")
     bob   = sp.address("tz1678")
+    
+    # Put Sellers
+    alice = sp.address("tz1456")
     alex = sp.address("tz1910")
 
     scenario = sp.test_scenario()
-    c1 = PutContract(admin,100)
+    c1 =  PutOptions(admin,100,120,token)
     scenario += c1
 
-    scenario += c1.putSeller(amount=50000).run(sender=alice)
-    scenario += c1.putSeller(amount=10000).run(sender=alice)
-    scenario += c1.putSeller(amount=10000).run(sender=alex)
+    scenario += c1.putSeller(amount=50000).run(now=45,sender=alice,amount=sp.tez(100000))
+    scenario += c1.putSeller(amount=10000).run(now=45,sender=alice)
+    scenario += c1.putSeller(amount=10000).run(now=45,sender=alex)
     
-    scenario += c1.putBuyer(strikePrice=100,options=5,fee=100).run(sender=bob)
-    
-    # scenario += c1.modifyPrice(price=100).run(sender=admin)
-    # scenario += c1.resetContract().run(sender=admin)
-    
+    scenario += c1.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob)
+
+    scenario += c1.ModifyPrice(price=300).run(sender=admin)
+    scenario += c1.ReleaseContract().run(sender=bob)
