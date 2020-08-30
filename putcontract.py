@@ -53,6 +53,9 @@ class PutOptions(sp.Contract):
 
         PremiumCal =  sp.local('PremiumCal',params.StrikePrice*params.Options*Interest.value)
         
+        Payment = sp.local('Payment',params.StrikePrice*params.Options*Interest.value + params.StrikePrice*params.Options)
+        self.Lock(sp.sender,Payment.value)
+
         sp.if params.StrikePrice > self.data.xtzPrice: 
             PremiumCal.value += abs((params.StrikePrice - self.data.xtzPrice)*100)
 
@@ -88,9 +91,7 @@ class PutOptions(sp.Contract):
         sp.verify(params.amount %10000 == 0 )
         # Token Contract Call 
 
-        #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "LockToken").open_some()
-        #mydata = sp.record(address = sp.sender,amount=params.amount)
-        #sp.transfer(mydata, sp.mutez(0), c)
+        self.Lock(sp.sender,params.amount)
 
         sp.if self.data.poolSet.contains(sp.sender):
 
@@ -112,13 +113,13 @@ class PutOptions(sp.Contract):
         sp.verify(self.data.contractBuyer.contains(sp.sender))
 
         sp.verify(sp.now < self.data.contractBuyer[sp.sender].expiry)
-
+        
         sp.if self.data.contractBuyer[sp.sender].strikePrice > self.data.xtzPrice:  
             # Pass amount to the token amount 
             #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "UnlockToken").open_some()
             #mydata = sp.record(address = sp.sender,amount=params.amount)
             #sp.transfer(mydata, sp.mutez(0), c)
-
+            self.data.adminAccount += self.data.contractBuyer[sp.sender].adminpayment
             Amount = sp.local('Amount',(self.data.contractBuyer[sp.sender].strikePrice - self.data.xtzPrice)*100)
             PoolAmount = sp.local('PoolAmount',(self.data.contractBuyer[sp.sender].strikePrice*self.data.contractBuyer[sp.sender].options)*100 - self.data.contractBuyer[sp.sender].adminpayment)
 
@@ -130,25 +131,27 @@ class PutOptions(sp.Contract):
             
                 self.data.contractSellar[i].amount += self.data.contractBuyer[sp.sender].pool[i]
 
-            sp.send(sp.sender,sp.tez(TotalCal.value))
+            sp.if  TotalCal.value != abs(Amount.value): 
+                self.data.adminAccount = abs( self.data.adminAccount - abs(abs(Amount.value) - TotalCal.value)) 
+
+            sp.send(sp.sender,sp.tez(abs(Amount.value)))
+            self.Unlock(sp.sender,abs(Amount.value))
             self.data.buyerSet.remove(sp.sender)
             del self.data.contractBuyer[sp.sender]
 
     @sp.entry_point
     def ResetContract(self):
         
-        sp.verify(sp.sender == self.data.administrator)
-        sp.verify(sp.now >  self.data.validation.cycleEnd)
-
         sp.for i in self.data.buyerSet.elements():
 
-            sp.for j in self.data.contractBuyer[i].pool.keys():
-                self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
+            sp.if sp.now > self.data.contractBuyer[i].expiry: 
+                sp.for j in self.data.contractBuyer[i].pool.keys():
+                    self.data.contractSellar[j].amount += self.data.contractBuyer[i].pool[j]
+                    
+                self.data.adminAccount += self.data.contractBuyer[i].adminpayment
+                self.data.buyerSet.remove(i)
+                del self.data.contractBuyer[i]
                 
-            self.data.adminAccount += self.data.contractBuyer[i].adminpayment
-            self.data.buyerSet.remove(i)
-            del self.data.contractBuyer[i]
-            
             
     @sp.entry_point
     def WithdrawToken(self,params):
@@ -157,13 +160,31 @@ class PutOptions(sp.Contract):
         sp.verify(sp.now < self.data.validation.withdrawTime)
         sp.verify(self.data.contractSellar.contains(sp.sender))
 
-        # Pass amount to the token amount 
-        #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "UnlockToken").open_some()
-        #mydata = sp.record(address = sp.sender,amount=params.amount)
-        #sp.transfer(mydata, sp.mutez(0), c)
+        Payment = sp.local('Payment',self.data.contractSellar[sp.sender].premium + self.data.contractSellar[sp.sender].amount)
+        
+        self.Unlock(sp.sender,Payment.value)
+
         self.data.poolSet.remove(sp.sender)
         del self.data.contractSellar[sp.sender]
 
+    @sp.entry_point
+    def WithdrawPremium(self,params):
+        sp.verify(self.data.contractSellar.contains(sp.sender))
+        sp.verify(self.data.contractSellar[sp.sender].premium > 0 )
+
+        self.Unlock(sp.sender,self.data.contractSellar[sp.sender].premium)
+        self.data.contractSellar[sp.sender].premium  = 0
+
+
+    def Lock(self,address,amount):
+        c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TNat), self.data.tokenContract, entry_point = "LockToken").open_some()
+        mydata = sp.record(address = address,amount=amount)
+        sp.transfer(mydata, sp.mutez(0), c)
+    
+    def Unlock(self,address,amount):
+        c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TNat), self.data.tokenContract, entry_point = "UnlockToken").open_some()
+        mydata = sp.record(address = address,amount=amount)
+        sp.transfer(mydata, sp.mutez(0), c)
 
 
     @sp.entry_point
@@ -171,6 +192,7 @@ class PutOptions(sp.Contract):
         sp.verify(sp.sender == self.data.administrator)
         self.data.xtzPrice = params.price
 
+        
 @sp.add_test(name = "Put Contract Testing")
 def test():
     
