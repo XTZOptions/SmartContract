@@ -144,7 +144,16 @@ class PutOptions(sp.Contract):
                 self.data.buyerSet.remove(i)
                 del self.data.contractBuyer[i]
             
-            
+    
+    @sp.entry_point
+    def WithdrawPremium(self):
+        sp.verify(self.data.contractSellar.contains(sp.sender))
+        sp.verify(self.data.contractSellar[sp.sender].premium > 0 )
+
+        # Transfer All the Premium 
+        
+        self.data.contractSellar[sp.sender].premium  = 0 
+
     @sp.entry_point
     def WithdrawToken(self,params):
         
@@ -159,7 +168,13 @@ class PutOptions(sp.Contract):
         self.data.poolSet.remove(sp.sender)
         del self.data.contractSellar[sp.sender]
 
+    @sp.entry_point
+    def RestartCycle(self,param):
+        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(sp.now > self.data.validation.withdrawTime)
 
+        self.data.validation.cycleEnd = sp.now.add_days(23)
+        self.data.validation.withdrawTime = sp.now.add_days(25)
 
     @sp.entry_point
     def ModifyPrice(self,params):
