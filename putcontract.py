@@ -31,10 +31,11 @@ class PutOptions(sp.Contract):
         Interest = sp.local('Interest',self.data.model[params.StrikePrice*100][params.expire])
         
         Deadline = sp.now.add_days(params.expire)
+
+
+        sp.verify(self.data.validation.totalSupply > TotalAmount.value)
+        sp.verify(self.data.validation.cycleEnd > sp.now.add_days(params.expire))
         
-        # Transfer Token to the Contract 
-
-
         # Deleting Pricing Model 
         del self.data.model[self.data.xtzPrice*90]
         del self.data.model[self.data.xtzPrice*95]
@@ -115,10 +116,7 @@ class PutOptions(sp.Contract):
         sp.verify(sp.now < self.data.contractBuyer[sp.sender].expiry)
         
         sp.if self.data.contractBuyer[sp.sender].strikePrice > self.data.xtzPrice:  
-            # Pass amount to the token amount 
-            #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "UnlockToken").open_some()
-            #mydata = sp.record(address = sp.sender,amount=params.amount)
-            #sp.transfer(mydata, sp.mutez(0), c)
+           
             self.data.adminAccount += self.data.contractBuyer[sp.sender].adminpayment
             Amount = sp.local('Amount',(self.data.contractBuyer[sp.sender].strikePrice - self.data.xtzPrice)*100)
             PoolAmount = sp.local('PoolAmount',(self.data.contractBuyer[sp.sender].strikePrice*self.data.contractBuyer[sp.sender].options)*100 - self.data.contractBuyer[sp.sender].adminpayment)
@@ -192,13 +190,20 @@ class PutOptions(sp.Contract):
         sp.verify(sp.sender == self.data.administrator)
         self.data.xtzPrice = params.price
 
-        
+    @sp.entry_point
+    def RestartCycle(self):
+        sp.verify(sp.sender == self.data.administrator)
+        sp.verify(sp.now > self.data.validation.withdrawTime)
+
+        self.data.validation.cycleEnd = sp.now.add_days(23)
+        self.data.validation.withdrawTime = sp.now.add_days(25)
+
 @sp.add_test(name = "Put Contract Testing")
 def test():
     
     admin = sp.address("tz1hPnEdcKWrdeZEAQiGfmV6knHA5En1fCwQ")
     # Put Buyers    
-    token = sp.address("KT1XKqN7zAKHTYa8ck36Gc8ti4PeRKWa9v8P")
+    token = sp.address("KT1KtyJeL78tdHnzwCPE8M14WDb1zqsnLkjQ")
     bob   = sp.address("tz1678")
     
     # Put Sellers
@@ -206,14 +211,18 @@ def test():
     alex = sp.address("tz1910")
 
     scenario = sp.test_scenario()
-    c1 =  PutOptions(admin,100,120,token)
+    c1 =  PutOptions(admin,10,20,token)
     scenario += c1
-
+    scenario += c1.RestartCycle().run(sender=admin,now=30)
+    scenario += c1.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob,valid=False)
+    
     scenario += c1.putSeller(amount=50000).run(now=45,sender=alice,amount=sp.tez(100000))
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alice)
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alex)
     
-    scenario += c1.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob)
 
-    scenario += c1.ModifyPrice(price=300).run(sender=admin)
-    scenario += c1.ReleaseContract().run(sender=bob)
+    scenario += c1.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob)
+    #scenario += c1.ResetContract().run(sender=alice,now=1209655)
+    
+    # scenario += c1.ModifyPrice(price=300).run(sender=admin)
+    # scenario += c1.ReleaseContract().run(sender=bob)
