@@ -285,12 +285,20 @@ class PutOptions(sp.Contract):
         sp.verify(sp.now < self.data.validation.withdrawTime)
         sp.verify(self.data.contractSellar.contains(sp.sender))
 
-        # Pass amount to the token amount 
-        #c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.tokenContract, entry_point = "UnlockToken").open_some()
-        #mydata = sp.record(address = sp.sender,amount=params.amount)
-        #sp.transfer(mydata, sp.mutez(0), c)
+        Payment = sp.local('Payment',self.data.contractSellar[sp.sender].premium + self.data.contractSellar[sp.sender].amount)
+        
+        self.Unlock(sp.sender,Payment.value)
+
         self.data.poolSet.remove(sp.sender)
         del self.data.contractSellar[sp.sender]
+
+    @sp.entry_point
+    def WithdrawPremium(self,params):
+        sp.verify(self.data.contractSellar.contains(sp.sender))
+        sp.verify(self.data.contractSellar[sp.sender].premium > 0 )
+
+        self.Unlock(sp.sender,self.data.contractSellar[sp.sender].premium)
+        self.data.contractSellar[sp.sender].premium  = 0
 
 
     def Lock(self,address,amount):
@@ -333,5 +341,6 @@ def test():
     scenario += c1.mint(address = bob.address, value = 1).run(sender = bob,amount = sp.tez(1))
 
     scenario += c2.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob)
-    scenario += c2.ModifyPrice(price=300).run(sender=admin)
-    scenario += c2.ReleaseContract().run(sender=bob)
+    scenario += c2.WithdrawPremium().run(sender=alice)
+    # scenario += c2.ModifyPrice(price=300).run(sender=admin)
+    # scenario += c2.ReleaseContract().run(sender=bob)
