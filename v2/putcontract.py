@@ -17,11 +17,11 @@ class PutOptions(sp.Contract):
         sp.verify(sp.now < self.data.validation.cycleEnd)
         sp.verify(~ self.data.contractBuyer.contains(sp.sender))
         
-        self.data.model[self.data.xtzPrice*90] = {7:1,14:2,21:4}
-        self.data.model[self.data.xtzPrice*95] = {7:2,14:4,21:8}
+        self.data.model[self.data.xtzPrice*80] = {7:1,14:2,21:4}
+        self.data.model[self.data.xtzPrice*90] = {7:2,14:4,21:8}
         self.data.model[self.data.xtzPrice*100] = {7:4,14:8,21:16}
-        self.data.model[self.data.xtzPrice*105] = {7:2,14:4,21:8}
-        self.data.model[self.data.xtzPrice*110] = {7:1,14:2,21:4}
+        self.data.model[self.data.xtzPrice*110] = {7:2,14:4,21:8}
+        self.data.model[self.data.xtzPrice*120] = {7:1,14:2,21:4}
 
         sp.verify(self.data.model.contains(params.StrikePrice*100))
         sp.verify(self.data.model[params.StrikePrice*100].contains(params.expire))
@@ -37,11 +37,11 @@ class PutOptions(sp.Contract):
         sp.verify(self.data.validation.cycleEnd > sp.now.add_days(params.expire))
         
         # Deleting Pricing Model 
+        del self.data.model[self.data.xtzPrice*80]
         del self.data.model[self.data.xtzPrice*90]
-        del self.data.model[self.data.xtzPrice*95]
         del self.data.model[self.data.xtzPrice*100]
-        del self.data.model[self.data.xtzPrice*105]
         del self.data.model[self.data.xtzPrice*110]
+        del self.data.model[self.data.xtzPrice*120]
         
 
 
