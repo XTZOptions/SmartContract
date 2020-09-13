@@ -16,31 +16,63 @@ class XTZOracle(sp.Contract):
             self.data.keysset.add(params.contributor)
             
     @sp.entry_point
-    def getDataFromOrO(self,params):
+    def getDataMint(self,params):
+    
+        data = sp.record(price=self.data.xtzPrice,address=params.address,amount=params.amount)
         
-        data = sp.record(price=0)
-        contract = sp.contract(sp.TRecord( price = sp.TNat),sp.sender,entry_point = "receiveDataFromOrO").open_some()
-        data.price = self.data.xtzPrice
+        #contract = sp.contract(sp.TRecord( price = sp.TNat,address = sp.TAddress, amount = sp.TNat),sp.sender,entry_point = "OrOMint").open_some()
+        
+        self.data.xtzPrice = 101
+        # sp.if sp.amount == sp.mutez(100):
+        #     sp.transfer(data,sp.mutez(0),contract)
+        # sp.else:
+        #     sp.transfer(data,sp.amount,contract)
 
-        sp.if sp.amount == sp.mutez(100):
-            sp.transfer(data,sp.mutez(0),contract)
-        sp.else:
-            sp.transfer(data,sp.amount,contract)
+class ALAToken(sp.Contract):
+    def __init__(self, admin,oro):
+        self.init(paused = False, ledger = sp.big_map(tvalue = sp.TRecord(approvals = sp.TMap(sp.TAddress, sp.TNat), balance = sp.TNat)), administrator = admin, totalSupply = 0
+        ,contract= sp.set([admin]),OrO=oro)
+
+    @sp.entry_point
+    def mint(self, params):
+        sp.verify(params.value>0)
+        tezValue=sp.tez(sp.as_nat(params.value))
+        sp.verify(sp.amount == tezValue)
+        
+        c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TNat), self.data.OrO, entry_point = "getDataMint").open_some()
+        mydata = sp.record(address = sp.sender,amount=abs(params.value))
+
+        #sp.transfer(mydata, sp.mutez(100), c)
+    
+    @sp.entry_point
+    def OrOMint(self,params):
+        sp.verify(sp.sender == self.data.OrO )
+        self.addAddressIfNecessary(params.address)
+        self.data.ledger[params.address].balance += abs(params.price*params.value*100)
+
+        self.data.totalSupply += abs(params.price*params.value*100)
 
 
+    def addAddressIfNecessary(self, address):
+        sp.if ~ self.data.ledger.contains(address):
+            self.data.ledger[address] = sp.record(balance = 0, approvals = {})
+    
 @sp.add_test(name="XTZOracle Testing")
 def test():
     scenario = sp.test_scenario()
+    
     admin = sp.test_account("Alice")
+    alice = sp.test_account("Alice")
+    bob   = sp.test_account("Robert")
 
     oracle = XTZOracle(admin.address)
     scenario += oracle
     
     scenario += oracle.feedData(price=400).run(sender=admin)
     scenario += oracle.feedData(price=600).run(sender=admin)
+
+    token = ALAToken(admin.address,oracle.address)
+    scenario += token 
     
-    # scenario += oracle.feedData(currency = "INR", buy = 545791 , sell = 545791).run(sender=sp.address('tz1-AAA'))
-    # scenario += oracle.addDataContributor(contributor=sp.address("tz1-AAA")).run(sender=sp.address('tz1beX9ZDev6SVVW9yJwNYA89362ZpWuDwou'))
-    # scenario += oracle.feedData(currency = "INR", buy = 545791 , sell = 545791).run(sender=sp.address('tz1-AAA'))
-    # # scenario += oracle.getDataFromOrO(currency = "INR").run(sender=sp.address("KT1-AAA") , amount = sp.mutez(5000))
-    # scenario += oracle.getDataFromOrO(currency = "INR").run(sender=sp.address("KT1-BBB") , amount = sp.mutez(4000))
+    scenario += token.mint(value=10).run(sender=alice,amount=sp.tez(10))
+    scenario += oracle.getDataMint(address=alice.address,amount=10).run(sender=alice)
