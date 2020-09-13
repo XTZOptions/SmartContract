@@ -39,15 +39,30 @@ class ALAToken(sp.Contract):
         sp.verify(sp.sender == self.data.administrator)
         self.data.administrator = params
 
+    
     @sp.entry_point
     def mint(self, params):
         sp.verify(params.value>0)
         tezValue=sp.tez(sp.as_nat(params.value))
         sp.verify(sp.amount == tezValue)
-        self.addAddressIfNecessary(params.address)
-        self.data.ledger[params.address].balance += abs(self.data.xtzPrice*params.value*100)
-        self.data.totalSupply += abs(self.data.xtzPrice*params.value*100)
+        
+        c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.OrO, entry_point = "getDataMint").open_some()
+        mydata = sp.record(address = sp.sender,amount=params.value)
 
+        sp.transfer(mydata, sp.mutez(100), c)
+
+    @sp.entry_point
+    def OrOMint(self,params):
+        sp.verify(sp.sender == self.data.OrO )
+        self.addAddressIfNecessary(params.address)
+        sp.verify(params.price>0)
+        sp.verify(params.amount>0)
+        
+        self.data.ledger[params.address].balance += abs(params.price*params.amount*100)
+
+        self.data.totalSupply += abs(params.price*params.amount*100)
+        
+    
     @sp.entry_point
     def burn(self, params):
         sp.set_type(params, sp.TRecord(address = sp.TAddress, value = sp.TNat))
