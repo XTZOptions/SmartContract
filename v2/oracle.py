@@ -18,13 +18,12 @@ class XTZOracle(sp.Contract):
     @sp.entry_point
     def getDataMint(self,params):
     
-        data = sp.record(price=self.data.xtzPrice,address=params.address,amount=params.amount)
+        data = sp.record(price=sp.to_int(self.data.xtzPrice),address=params.address,amount=params.amount)
         
-        #contract = sp.contract(sp.TRecord( price = sp.TNat,address = sp.TAddress, amount = sp.TNat),sp.sender,entry_point = "OrOMint").open_some()
+        contract = sp.contract(sp.TRecord( price = sp.TInt,address = sp.TAddress, amount = sp.TInt),sp.sender,entry_point = "OrOMint").open_some()
         
-        self.data.xtzPrice = 101
-        # sp.if sp.amount == sp.mutez(100):
-        #     sp.transfer(data,sp.mutez(0),contract)
+        sp.if sp.amount == sp.mutez(10):
+            sp.transfer(data,sp.mutez(0),contract)
         # sp.else:
         #     sp.transfer(data,sp.amount,contract)
 
@@ -39,18 +38,21 @@ class ALAToken(sp.Contract):
         tezValue=sp.tez(sp.as_nat(params.value))
         sp.verify(sp.amount == tezValue)
         
-        c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TNat), self.data.OrO, entry_point = "getDataMint").open_some()
-        mydata = sp.record(address = sp.sender,amount=abs(params.value))
+        c = sp.contract(sp.TRecord(address = sp.TAddress, amount = sp.TInt), self.data.OrO, entry_point = "getDataMint").open_some()
+        mydata = sp.record(address = sp.sender,amount=params.value)
 
-        #sp.transfer(mydata, sp.mutez(100), c)
+        sp.transfer(mydata, sp.mutez(10), c)
     
     @sp.entry_point
     def OrOMint(self,params):
         sp.verify(sp.sender == self.data.OrO )
         self.addAddressIfNecessary(params.address)
-        self.data.ledger[params.address].balance += abs(params.price*params.value*100)
+        sp.verify(params.price>0)
+        sp.verify(params.amount>0)
+        
+        self.data.ledger[params.address].balance += abs(params.price*params.amount*100)
 
-        self.data.totalSupply += abs(params.price*params.value*100)
+        self.data.totalSupply += abs(params.price*params.amount*100)
 
 
     def addAddressIfNecessary(self, address):
@@ -68,11 +70,13 @@ def test():
     oracle = XTZOracle(admin.address)
     scenario += oracle
     
+    token = ALAToken(admin.address,oracle.address)
+    scenario += token 
+
     scenario += oracle.feedData(price=400).run(sender=admin)
     scenario += oracle.feedData(price=600).run(sender=admin)
 
-    token = ALAToken(admin.address,oracle.address)
-    scenario += token 
+    
     
     scenario += token.mint(value=10).run(sender=alice,amount=sp.tez(10))
-    scenario += oracle.getDataMint(address=alice.address,amount=10).run(sender=alice)
+    #scenario += oracle.getDataMint(address=alice.address,amount=10).run(sender=alice)
