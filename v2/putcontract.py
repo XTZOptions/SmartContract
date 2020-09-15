@@ -7,8 +7,7 @@ class PutOptions(sp.Contract):
         self.init(contractBuyer= sp.big_map(),contractSellar = sp.big_map(),
         administrator = admin,buyerSet = sp.set(),poolSet=sp.set(),
             xtzPrice=400,validation=sp.record(cycleEnd=sp.timestamp(endCycle),withdrawTime=sp.timestamp(endWithdraw),totalSupply=sp.nat(0)),
-            tokenContract=token,adminAccount=0,model = sp.map()
-        )
+            tokenContract=token,adminAccount=0,model=sp.map())
 
 
     @sp.entry_point
@@ -17,18 +16,45 @@ class PutOptions(sp.Contract):
         sp.verify(sp.now < self.data.validation.cycleEnd)
         sp.verify(~ self.data.contractBuyer.contains(sp.sender))
         
-        self.data.model[self.data.xtzPrice*80] = {7:1,14:2,21:4}
-        self.data.model[self.data.xtzPrice*90] = {7:2,14:4,21:8}
-        self.data.model[self.data.xtzPrice*100] = {7:4,14:8,21:16}
-        self.data.model[self.data.xtzPrice*110] = {7:2,14:4,21:8}
-        self.data.model[self.data.xtzPrice*120] = {7:1,14:2,21:4}
+        price = sp.set([80,90,100,110,120])
+        duration = sp.set([7,14,21])
+        
+        sp.verify(price.contains(params.StrikePrice))
+        sp.verify(params.Options>0)
+        sp.verify(duration.contains(params.expire))
+        
+        sp.verify(self.data.validation.cycleEnd > sp.now.add_days(params.expire))
 
-        sp.verify(self.data.model.contains(params.StrikePrice*100))
-        sp.verify(self.data.model[params.StrikePrice*100].contains(params.expire))
+        #Oracle Call
+
+    @sp.entry_point
+    def OrOputBuyer(self,params):
+
+        # Verify Oracle Address
+
+        sp.verify(sp.now < self.data.validation.cycleEnd)
+        sp.verify(~ self.data.contractBuyer.contains(params.address))
+
+        self.data.model[80] = {7:1,14:2,21:4}
+        self.data.model[90] = {7:2,14:4,21:8}
+        self.data.model[100] = {7:4,14:8,21:16}
+        self.data.model[110] = {7:2,14:4,21:8}
+        self.data.model[120] = {7:1,14:2,21:4}
+
+        sp.verify(self.data.model.contains(params.Ratio))
+
+        sp.verify(self.data.model[params.Ratio].contains(params.expire))
         
         TotalAmount = sp.local('TotalAmount',params.StrikePrice*params.Options*100)
 
-        Interest = sp.local('Interest',self.data.model[params.StrikePrice*100][params.expire])
+        Interest = sp.local('Interest',self.data.model[params.Ratio][params.expire])
+        
+        del self.data.model[80]
+        del self.data.model[90]
+        del self.data.model[100]
+        del self.data.model[110]
+        del self.data.model[120]
+        
         
         Deadline = sp.now.add_days(params.expire)
 
@@ -36,14 +62,6 @@ class PutOptions(sp.Contract):
         sp.verify(self.data.validation.totalSupply > TotalAmount.value)
         sp.verify(self.data.validation.cycleEnd > sp.now.add_days(params.expire))
         
-        # Deleting Pricing Model 
-        del self.data.model[self.data.xtzPrice*80]
-        del self.data.model[self.data.xtzPrice*90]
-        del self.data.model[self.data.xtzPrice*100]
-        del self.data.model[self.data.xtzPrice*110]
-        del self.data.model[self.data.xtzPrice*120]
-        
-
 
         self.data.adminAccount += params.StrikePrice*params.Options
         self.data.buyerSet.add(sp.sender)
@@ -55,20 +73,22 @@ class PutOptions(sp.Contract):
         PremiumCal =  sp.local('PremiumCal',params.StrikePrice*params.Options*Interest.value)
         
         Payment = sp.local('Payment',params.StrikePrice*params.Options*Interest.value + params.StrikePrice*params.Options)
-        self.Lock(sp.sender,Payment.value)
+        
 
-        sp.if params.StrikePrice > self.data.xtzPrice: 
-            PremiumCal.value += abs((params.StrikePrice - self.data.xtzPrice)*100)
+        sp.if params.StrikePrice > params.xtzPrice: 
+            PremiumCal.value += abs((params.StrikePrice - params.xtzPrice)*100)
+            Payment.value += abs((params.StrikePrice - params.xtzPrice)*100)
 
+        self.Lock(params.address,Payment.value)
         PremiumTotal = sp.local('PremiumTotal',0)
        
-        self.data.contractBuyer[sp.sender] = sp.record(strikePrice = params.StrikePrice, pool = sp.map(),adminpayment =0,options=params.Options,
+        self.data.contractBuyer[params.address] = sp.record(strikePrice = params.StrikePrice, pool = sp.map(),adminpayment =0,options=params.Options,
         expiry=Deadline)
 
         sp.for i in self.data.poolSet.elements():
-            self.data.contractBuyer[sp.sender].pool[i] = (self.data.contractSellar[i].amount*TotalAmount.value)/self.data.validation.totalSupply 
+            self.data.contractBuyer[params.address].pool[i] = (self.data.contractSellar[i].amount*TotalAmount.value)/self.data.validation.totalSupply 
             
-            CollateralTotal.value += self.data.contractBuyer[sp.sender].pool[i]
+            CollateralTotal.value += self.data.contractBuyer[params.address].pool[i]
             
             self.data.contractSellar[i].premium += (self.data.contractSellar[i].amount*PremiumCal.value)/self.data.validation.totalSupply 
             PremiumTotal.value += (self.data.contractSellar[i].amount*PremiumCal.value)/self.data.validation.totalSupply 
@@ -80,7 +100,7 @@ class PutOptions(sp.Contract):
         self.data.validation.totalSupply = abs(self.data.validation.totalSupply - CollateralTotal.value)
 
         sp.if CollateralTotal.value !=  params.StrikePrice*params.Options*100: 
-            self.data.contractBuyer[sp.sender].adminpayment = abs(params.StrikePrice*params.Options*100 - CollateralTotal.value)
+            self.data.contractBuyer[params.address].adminpayment = abs(params.StrikePrice*params.Options*100 - CollateralTotal.value)
             self.data.adminAccount = abs(self.data.adminAccount - self.data.contractBuyer[sp.sender].adminpayment)
             
 
@@ -186,11 +206,6 @@ class PutOptions(sp.Contract):
 
 
     @sp.entry_point
-    def ModifyPrice(self,params):
-        sp.verify(sp.sender == self.data.administrator)
-        self.data.xtzPrice = params.price
-
-    @sp.entry_point
     def RestartCycle(self):
         sp.verify(sp.sender == self.data.administrator)
         sp.verify(sp.now > self.data.validation.withdrawTime)
@@ -214,18 +229,17 @@ def test():
     c1 =  PutOptions(admin,10,20,token)
     scenario += c1
     scenario += c1.RestartCycle().run(sender=admin,now=30)
-    scenario += c1.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob,valid=False)
+   
     
     scenario += c1.putSeller(amount=50000).run(now=45,sender=alice,amount=sp.tez(100000))
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alice)
     scenario += c1.putSeller(amount=10000).run(now=45,sender=alex)
     
 
-    scenario += c1.putBuyer(StrikePrice=400,Options=1,expire=14).run(now=50,sender=bob)
+    scenario += c1.OrOputBuyer(Options=1,Ratio=120,StrikePrice=480,address=bob,expire=14,xtzPrice=400).run(now=50,sender=bob)
+    # scenario += c1.putBuyer(StrikePrice=90,Options=1,expire=14).run(now=50,sender=bob)
     #scenario += c1.ResetContract().run(sender=alice,now=1209655)
     
-    scenario += c1.ModifyPrice(price=300).run(sender=admin)
-    scenario += c1.ReleaseContract().run(sender=bob)
+    # scenario += c1.ModifyPrice(price=300).run(sender=admin)
+    # scenario += c1.ReleaseContract().run(sender=bob)
 
-
-# 33,000 -> putbuyer -> oracle -> optionsctonra (price,options,strikepirce) -> identity -> update -> Lock- token
