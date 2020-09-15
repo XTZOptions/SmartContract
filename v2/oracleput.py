@@ -65,7 +65,7 @@ class PutOptions(sp.Contract):
 
         self.init(contractBuyer= sp.big_map(),contractSellar = sp.big_map(),
         administrator = admin,buyerSet = sp.set(),poolSet=sp.set(),
-            xtzPrice=400,validation=sp.record(cycleEnd=sp.timestamp(endCycle),withdrawTime=sp.timestamp(endWithdraw),totalSupply=sp.nat(0)),
+           validation=sp.record(cycleEnd=sp.timestamp(endCycle),withdrawTime=sp.timestamp(endWithdraw),totalSupply=sp.nat(0)),
             tokenContract=token,adminAccount=0,model=sp.map(),Oracle=oro)
 
 
@@ -193,35 +193,36 @@ class PutOptions(sp.Contract):
 
         self.data.validation.totalSupply += params.amount
             
+    
     @sp.entry_point
-    def ReleaseContract(self):
+    def ReleaseContract(self,params):
         
         sp.verify(sp.now < self.data.validation.cycleEnd)
-        sp.verify(self.data.contractBuyer.contains(sp.sender))
+        sp.verify(self.data.contractBuyer.contains(params.address))
 
-        sp.verify(sp.now < self.data.contractBuyer[sp.sender].expiry)
+        sp.verify(sp.now < self.data.contractBuyer[params.address].expiry)
         
-        sp.if self.data.contractBuyer[sp.sender].strikePrice > self.data.xtzPrice:  
+        sp.if self.data.contractBuyer[params.address].strikePrice > params.xtzPrice:  
            
-            self.data.adminAccount += self.data.contractBuyer[sp.sender].adminpayment
-            Amount = sp.local('Amount',(self.data.contractBuyer[sp.sender].strikePrice - self.data.xtzPrice)*100)
-            PoolAmount = sp.local('PoolAmount',(self.data.contractBuyer[sp.sender].strikePrice*self.data.contractBuyer[sp.sender].options)*100 - self.data.contractBuyer[sp.sender].adminpayment)
+            self.data.adminAccount += self.data.contractBuyer[params.address].adminpayment
+            Amount = sp.local('Amount',(self.data.contractBuyer[params.address].strikePrice - params.xtzPrice)*100)
+            PoolAmount = sp.local('PoolAmount',(self.data.contractBuyer[params.address].strikePrice*self.data.contractBuyer[params.address].options)*100 - self.data.contractBuyer[params.address].adminpayment)
 
             TotalCal =  sp.local('TotalCal',0)
 
-            sp.for i in  self.data.contractBuyer[sp.sender].pool.keys():
-                TotalCal.value += (self.data.contractBuyer[sp.sender].pool[i]*abs(Amount.value))/abs(PoolAmount.value)
-                self.data.contractBuyer[sp.sender].pool[i] = abs(self.data.contractBuyer[sp.sender].pool[i] - (self.data.contractBuyer[sp.sender].pool[i]*abs(Amount.value))/abs(PoolAmount.value)) 
+            sp.for i in  self.data.contractBuyer[params.address].pool.keys():
+                TotalCal.value += (self.data.contractBuyer[params.address].pool[i]*abs(Amount.value))/abs(PoolAmount.value)
+                self.data.contractBuyer[params.address].pool[i] = abs(self.data.contractBuyer[params.address].pool[i] - (self.data.contractBuyer[params.address].pool[i]*abs(Amount.value))/abs(PoolAmount.value)) 
             
-                self.data.contractSellar[i].amount += self.data.contractBuyer[sp.sender].pool[i]
+                self.data.contractSellar[i].amount += self.data.contractBuyer[params.address].pool[i]
 
             sp.if  TotalCal.value != abs(Amount.value): 
                 self.data.adminAccount = abs( self.data.adminAccount - abs(abs(Amount.value) - TotalCal.value)) 
 
-            sp.send(sp.sender,sp.tez(abs(Amount.value)))
-            self.Unlock(sp.sender,abs(Amount.value))
-            self.data.buyerSet.remove(sp.sender)
-            del self.data.contractBuyer[sp.sender]
+            
+            self.Unlock(params.address,abs(Amount.value))
+            self.data.buyerSet.remove(params.address)
+            del self.data.contractBuyer[params.address]
 
     @sp.entry_point
     def ResetContract(self):
