@@ -96,7 +96,7 @@ class PutOptions(sp.Contract):
     def OrOputBuyer(self,params):
 
         # Verify Oracle Address
-        #sp.verify(sp.sender == self.data.Oracle)
+        sp.verify(sp.sender == self.data.Oracle)
 
         sp.verify(sp.now < self.data.validation.cycleEnd)
         sp.verify(~ self.data.contractBuyer.contains(params.address))
